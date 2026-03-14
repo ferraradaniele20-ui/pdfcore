@@ -1,0 +1,1600 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>PDF Core — Web</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=IBM+Plex+Sans:wght@300;400;600&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f4f1eb;--surface:#fff;--border:#d8d3c8;--border2:#c4bfb3;
+  --accent:#007AFF;--accent-dark:#005fcc;--green:#34C759;--green-dark:#249c41;
+  --red:#e05a5a;--red-dark:#b83a3a;--text:#1a1a1a;--muted:#888880;--tag-bg:#e8e4dc;
+  --sel:#d0e8ff;--fill-handle:#007AFF;--orange:#FF9500;--excel:#1e6e3e;
+}
+body{background:var(--bg);color:var(--text);font-family:'IBM Plex Mono',monospace;min-height:100vh;overflow-x:hidden;user-select:none;}
+
+/* ══════════════════════════════════════════════
+   SCHERMATA LOGIN
+══════════════════════════════════════════════ */
+#login-screen{
+  position:fixed;inset:0;z-index:5000;
+  background:var(--text);
+  display:flex;align-items:center;justify-content:center;
+  flex-direction:column;
+  animation:fadeIn .3s ease;
+}
+#login-screen.hidden{display:none;}
+.login-box{
+  background:var(--bg);
+  border:1px solid var(--border2);
+  border-radius:4px;
+  padding:40px 44px;
+  width:360px;
+  max-width:90vw;
+}
+.login-logo{
+  font-family:'IBM Plex Sans',sans-serif;
+  font-size:1.4rem;font-weight:600;
+  letter-spacing:-.02em;
+  margin-bottom:4px;
+}
+.login-sub{font-size:10px;color:var(--muted);letter-spacing:.15em;text-transform:uppercase;margin-bottom:28px;}
+.login-creator{margin-top:24px;padding-top:16px;border-top:1px solid var(--border);text-align:center;}
+.login-creator .cr-name{font-size:11px;font-weight:600;color:var(--text);letter-spacing:.05em;}
+.login-creator .cr-phone{font-size:11px;color:var(--muted);margin-top:3px;letter-spacing:.08em;}
+.login-creator .cr-role{font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);margin-bottom:6px;}
+.login-field{margin-bottom:16px;}
+.login-field label{display:block;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:6px;}
+.login-field input{
+  width:100%;font-family:'IBM Plex Mono',monospace;font-size:13px;
+  background:var(--surface);border:1px solid var(--border2);
+  border-radius:2px;padding:10px 12px;color:var(--text);outline:none;
+  transition:border-color .15s;
+}
+.login-field input:focus{border-color:var(--accent);}
+.login-err{font-size:11px;color:var(--red);margin-bottom:12px;display:none;}
+.login-err.show{display:block;}
+.btn-login{
+  width:100%;font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:500;
+  letter-spacing:.1em;text-transform:uppercase;padding:11px;border:none;
+  border-radius:2px;background:var(--accent);color:#fff;cursor:pointer;
+  transition:background .15s;margin-top:4px;
+}
+.btn-login:hover{background:var(--accent-dark);}
+
+/* ══════════════════════════════════════════════
+   HEADER
+══════════════════════════════════════════════ */
+header{
+  background:var(--text);color:var(--bg);
+  padding:18px 36px;
+  display:flex;align-items:center;justify-content:space-between;
+  flex-wrap:wrap;gap:10px;
+}
+.header-left{display:flex;align-items:baseline;gap:12px;}
+header h1{font-family:'IBM Plex Sans',sans-serif;font-size:1.3rem;font-weight:600;letter-spacing:-.02em;}
+.version{font-size:10px;letter-spacing:.18em;color:#888;text-transform:uppercase;}
+.header-right{display:flex;align-items:center;gap:14px;}
+.user-badge{
+  display:flex;align-items:center;gap:8px;
+  font-size:11px;color:#aaa;
+}
+.user-avatar{
+  width:28px;height:28px;border-radius:50%;
+  background:var(--accent);color:#fff;
+  display:flex;align-items:center;justify-content:center;
+  font-size:12px;font-weight:600;font-family:'IBM Plex Sans',sans-serif;
+}
+.user-role{
+  font-size:9px;letter-spacing:.12em;text-transform:uppercase;
+  padding:2px 7px;border-radius:2px;
+}
+.role-admin{background:rgba(255,149,0,.18);color:var(--orange);}
+.role-user{background:rgba(0,122,255,.15);color:var(--accent);}
+.btn-header{
+  font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:500;
+  letter-spacing:.1em;text-transform:uppercase;padding:6px 12px;
+  border:1px solid #333;border-radius:2px;background:transparent;
+  color:#aaa;cursor:pointer;transition:border-color .15s,color .15s;
+}
+.btn-header:hover{border-color:#888;color:#fff;}
+.btn-admin-open{border-color:var(--orange);color:var(--orange);}
+.btn-admin-open:hover{background:rgba(255,149,0,.1);}
+
+/* ══════════════════════════════════════════════
+   APP MAIN
+══════════════════════════════════════════════ */
+#app{display:none;padding-bottom:80px;}
+#app.visible{display:block;}
+main{max-width:1160px;margin:0 auto;padding:32px 28px 0;}
+.section-label{font-size:10px;letter-spacing:.25em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;}
+
+/* DROP ZONE */
+#drop-zone{background:var(--surface);border:1.5px dashed var(--border2);border-radius:2px;padding:32px;text-align:center;cursor:pointer;position:relative;transition:border-color .2s,background .2s;margin-bottom:28px;}
+#drop-zone:hover,#drop-zone.drag-over{border-color:var(--accent);background:#f0f6ff;}
+#drop-zone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;}
+#drop-zone .dz-icon{font-size:28px;margin-bottom:8px;display:block;}
+#drop-zone h2{font-family:'IBM Plex Sans',sans-serif;font-size:.9rem;font-weight:600;margin-bottom:4px;}
+#drop-zone p{font-size:11px;color:var(--muted);}
+
+/* TOOLBAR */
+#table-wrap{display:none;}
+.table-toolbar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:10px;}
+.count-badge{background:var(--tag-bg);border:1px solid var(--border);border-radius:2px;padding:3px 10px;font-size:11px;letter-spacing:.08em;}
+
+/* BUTTONS */
+.btn{font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;padding:8px 16px;border:none;border-radius:2px;cursor:pointer;transition:background .15s,transform .1s;white-space:nowrap;}
+.btn:active{transform:scale(.97)}
+.btn-blue{background:var(--accent);color:#fff}.btn-blue:hover{background:var(--accent-dark)}
+.btn-green{background:var(--green);color:#fff}.btn-green:hover{background:var(--green-dark)}
+.btn-red{background:var(--red);color:#fff}.btn-red:hover{background:var(--red-dark)}
+.btn-ghost{background:transparent;border:1px solid var(--border2);color:var(--muted)}.btn-ghost:hover{border-color:var(--red);color:var(--red)}
+.btn-excel-style{background:var(--excel);color:#fff;}.btn-excel-style:hover{background:#155230;}
+.btn-sm{padding:5px 11px;font-size:10px;}
+
+/* LEGEND */
+.legend{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:10px;font-size:10px;color:var(--muted);letter-spacing:.05em;}
+.legend span{display:flex;align-items:center;gap:5px;}
+.legend kbd{background:var(--tag-bg);border:1px solid var(--border2);border-radius:2px;padding:1px 5px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--text);}
+
+/* TABLE */
+.tbl-container{overflow-x:auto;border:1px solid var(--border);border-radius:2px;background:var(--surface);}
+/* Virtualizzazione scrollabile */
+#tbl-scroll-wrap{max-height:520px;overflow-y:auto;overflow-x:auto;position:relative;border:1px solid var(--border);border-radius:2px;background:var(--surface);}
+#tbl-scroll-wrap table{width:100%;}
+#tbl-scroll-wrap thead th{position:sticky;top:0;z-index:10;}
+#tbl-spacer-top{background:transparent;}
+#tbl-spacer-bot{background:transparent;}
+.perf-badge{display:inline-block;background:var(--tag-bg);border:1px solid var(--border);border-radius:2px;padding:2px 8px;font-size:10px;color:var(--muted);margin-left:8px;}
+table{width:100%;border-collapse:collapse;font-size:12px;}
+thead th{background:var(--text);color:var(--bg);padding:10px;text-align:left;font-weight:500;letter-spacing:.06em;font-size:10px;text-transform:uppercase;white-space:nowrap;}
+thead th:first-child{width:42px;text-align:center;}
+thead th.col-preview{color:var(--accent);background:#0a1929;}
+tbody tr{border-bottom:1px solid var(--border);}
+tbody tr:last-child{border-bottom:none;}
+td{padding:0;vertical-align:middle;position:relative;}
+td.num{text-align:center;color:var(--muted);font-size:11px;padding:8px 4px;width:42px;}
+td.original{color:var(--muted);font-size:11px;max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:8px 10px;}
+td.preview{color:var(--accent);font-weight:500;font-size:12px;max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:8px 10px;}
+td.preview.empty{color:var(--border2);font-style:italic;}
+td.actions{white-space:nowrap;padding:4px 8px;}
+td.cell{cursor:cell;}
+td.cell.selected{background:var(--sel)!important;outline:2px solid var(--accent);outline-offset:-2px;z-index:2;}
+td.cell.in-range{background:#e8f3ff!important;}
+.part-input{font-family:'IBM Plex Mono',monospace;font-size:12px;background:transparent;border:none;padding:8px 10px;width:100%;color:var(--text);outline:none;cursor:default;caret-color:transparent;}
+.part-input.editing{cursor:text;caret-color:var(--text);}
+.fill-handle{position:absolute;right:-4px;bottom:-4px;width:8px;height:8px;background:var(--fill-handle);border:1px solid #fff;border-radius:1px;cursor:crosshair;z-index:10;display:none;}
+td.cell.selected .fill-handle{display:block;}
+
+/* Context menu */
+#ctx-menu{position:fixed;z-index:9999;background:var(--surface);border:1px solid var(--border2);border-radius:3px;box-shadow:0 4px 20px rgba(0,0,0,.12);min-width:210px;padding:4px 0;font-size:12px;display:none;}
+#ctx-menu .ctx-item{padding:8px 16px;cursor:pointer;display:flex;align-items:center;gap:10px;transition:background .1s;}
+#ctx-menu .ctx-item:hover{background:var(--sel);}
+#ctx-menu .ctx-item .ctx-icon{width:16px;text-align:center;font-size:13px;}
+#ctx-menu .ctx-item kbd{margin-left:auto;font-size:10px;color:var(--muted);background:var(--tag-bg);border:1px solid var(--border);border-radius:2px;padding:1px 4px;}
+#ctx-menu hr{border:none;border-top:1px solid var(--border);margin:4px 0;}
+#ctx-menu .ctx-section{padding:4px 16px 2px;font-size:10px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;}
+
+/* Status */
+#status-bar{display:none;align-items:center;gap:10px;margin-top:14px;padding:10px 14px;border-radius:2px;font-size:12px;}
+#status-bar.info{background:#e8f0fe;border:1px solid #c5d7fc;color:#1a56db}
+#status-bar.success{background:#e6f9ec;border:1px solid #b5e8c4;color:#1a7a36}
+#status-bar.error{background:#fdecea;border:1px solid #f7c5c2;color:#c0392b}
+
+/* Toggle */
+.toggle-row{display:flex;align-items:center;gap:10px;margin-bottom:16px;font-size:12px;color:var(--muted);}
+.toggle{position:relative;display:inline-block;width:36px;height:20px;}
+.toggle input{opacity:0;width:0;height:0;}
+.slider{position:absolute;inset:0;background:#ccc;border-radius:20px;cursor:pointer;transition:.2s;}
+.slider::before{content:'';position:absolute;height:14px;width:14px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.2s;}
+input:checked+.slider{background:var(--accent);}
+input:checked+.slider::before{transform:translateX(16px);}
+
+/* ══════════════════════════════════════════════
+   PANNELLO ADMIN
+══════════════════════════════════════════════ */
+#admin-panel{
+  position:fixed;inset:0;z-index:4000;
+  background:rgba(0,0,0,.55);
+  display:none;align-items:flex-start;justify-content:flex-end;
+  backdrop-filter:blur(2px);
+}
+#admin-panel.open{display:flex;animation:fadeIn .2s ease;}
+.admin-drawer{
+  background:var(--surface);
+  width:480px;max-width:95vw;
+  height:100%;
+  overflow-y:auto;
+  box-shadow:-8px 0 40px rgba(0,0,0,.18);
+  display:flex;flex-direction:column;
+}
+.admin-header{
+  background:var(--text);color:var(--bg);
+  padding:22px 28px;
+  display:flex;align-items:center;justify-content:space-between;
+}
+.admin-header h2{font-family:'IBM Plex Sans',sans-serif;font-size:1.1rem;font-weight:600;}
+.admin-header .sub{font-size:10px;color:#888;letter-spacing:.12em;text-transform:uppercase;margin-top:2px;}
+.admin-close{background:none;border:1px solid #444;color:#888;border-radius:2px;padding:6px 10px;cursor:pointer;font-size:16px;line-height:1;transition:color .15s,border-color .15s;}
+.admin-close:hover{color:#fff;border-color:#888;}
+
+.admin-body{padding:24px 28px;flex:1;}
+.admin-section-title{
+  font-size:10px;letter-spacing:.2em;text-transform:uppercase;
+  color:var(--muted);margin-bottom:14px;padding-bottom:8px;
+  border-bottom:1px solid var(--border);
+}
+
+/* Admin password change */
+.admin-pwd-row{display:flex;gap:10px;margin-bottom:24px;}
+.admin-pwd-row input{flex:1;font-family:'IBM Plex Mono',monospace;font-size:12px;background:var(--bg);border:1px solid var(--border2);border-radius:2px;padding:8px 10px;color:var(--text);outline:none;transition:border-color .15s;}
+.admin-pwd-row input:focus{border-color:var(--orange);}
+
+/* Users table */
+.users-table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:20px;}
+.users-table th{background:var(--tag-bg);padding:8px 10px;text-align:left;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);}
+.users-table td{padding:9px 10px;border-bottom:1px solid var(--border);vertical-align:middle;}
+.users-table tr:last-child td{border-bottom:none;}
+.users-table tr:hover td{background:#fafaf8;}
+.badge-active{background:#e6f9ec;color:var(--green-dark);border:1px solid #b5e8c4;border-radius:2px;padding:2px 7px;font-size:10px;letter-spacing:.06em;}
+.badge-inactive{background:#fdecea;color:var(--red);border:1px solid #f7c5c2;border-radius:2px;padding:2px 7px;font-size:10px;letter-spacing:.06em;}
+.pwd-cell{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.05em;color:var(--muted);}
+.btn-show-pwd{background:none;border:1px solid var(--border);border-radius:2px;padding:2px 6px;font-size:10px;cursor:pointer;color:var(--muted);transition:all .15s;margin-left:4px;}
+.btn-show-pwd:hover{border-color:var(--accent);color:var(--accent);}
+.badge-admin{background:rgba(255,149,0,.14);color:var(--orange);border:1px solid rgba(255,149,0,.3);border-radius:2px;padding:2px 7px;font-size:10px;}
+
+.btn-toggle-user{font-family:'IBM Plex Mono',monospace;font-size:10px;padding:4px 8px;border-radius:2px;cursor:pointer;border:1px solid var(--border2);background:transparent;color:var(--muted);transition:all .15s;}
+.btn-toggle-user.enable:hover{border-color:var(--green);color:var(--green);}
+.btn-toggle-user.disable:hover{border-color:var(--red);color:var(--red);}
+.btn-del-user{font-family:'IBM Plex Mono',monospace;font-size:10px;padding:4px 8px;border-radius:2px;cursor:pointer;border:1px solid var(--border2);background:transparent;color:var(--muted);margin-left:4px;transition:all .15s;}
+.btn-del-user:hover{border-color:var(--red);color:var(--red);}
+
+/* Add user form */
+.add-user-form{background:var(--bg);border:1px solid var(--border);border-radius:3px;padding:18px;margin-top:8px;}
+.add-user-form .form-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;}
+.add-user-form input,.add-user-form select{
+  font-family:'IBM Plex Mono',monospace;font-size:12px;
+  background:var(--surface);border:1px solid var(--border2);
+  border-radius:2px;padding:8px 10px;color:var(--text);outline:none;
+  transition:border-color .15s;width:100%;
+}
+.add-user-form input:focus,.add-user-form select:focus{border-color:var(--accent);}
+.add-user-form label{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:4px;}
+.form-field{display:flex;flex-direction:column;}
+
+/* Log attività */
+.log-list{font-size:11px;color:var(--muted);max-height:160px;overflow-y:auto;background:var(--bg);border:1px solid var(--border);border-radius:2px;padding:10px 12px;}
+.log-item{display:flex;gap:10px;padding:3px 0;border-bottom:1px solid var(--border);}
+.log-item:last-child{border-bottom:none;}
+.log-time{color:var(--border2);white-space:nowrap;font-size:10px;}
+.log-msg{color:var(--text);}
+
+/* Drag-row handle */
+td.drag-row{width:24px;text-align:center;color:var(--border2);cursor:grab;font-size:14px;padding:0 6px;user-select:none;}
+td.drag-row:active{cursor:grabbing;}
+tr.dragging-row{opacity:.35;}
+tr.drag-row-over td{border-top:2px solid var(--accent);}
+
+/* PDF Preview modal */
+#pdf-modal{position:fixed;inset:0;z-index:6000;background:rgba(0,0,0,.78);display:none;align-items:center;justify-content:center;backdrop-filter:blur(3px);}
+#pdf-modal.open{display:flex;animation:fadeIn .2s ease;}
+.pdf-modal-box{background:#3a3a3c;border-radius:3px;box-shadow:0 8px 40px rgba(0,0,0,.5);width:96vw;max-width:1100px;height:94vh;display:flex;flex-direction:column;overflow:hidden;}
+.pdf-modal-header{background:#1a1a1a;color:#ddd;padding:9px 14px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;gap:8px;flex-wrap:wrap;}
+.pdf-modal-title{font-size:11px;letter-spacing:.03em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0;color:#bbb;}
+.pdf-modal-nav{display:flex;align-items:center;gap:6px;flex-shrink:0;}
+.pdf-modal-nav button{background:#2c2c2e;border:1px solid #444;color:#ccc;border-radius:3px;padding:4px 10px;cursor:pointer;font-size:12px;font-family:'IBM Plex Mono',monospace;transition:all .15s;line-height:1.4;}
+.pdf-modal-nav button:hover:not(:disabled){color:#fff;border-color:#888;background:#3a3a3c;}
+.pdf-modal-nav button:disabled{opacity:.3;cursor:default;}
+.pdf-modal-pages{font-size:11px;color:#888;white-space:nowrap;min-width:50px;text-align:center;}
+/* toolbar zoom */
+.pdf-zoom-bar{display:flex;align-items:center;gap:5px;flex-shrink:0;}
+.pdf-zoom-bar button{background:#2c2c2e;border:1px solid #444;color:#ccc;border-radius:3px;padding:4px 9px;cursor:pointer;font-size:14px;line-height:1;transition:all .15s;}
+.pdf-zoom-bar button:hover{color:#fff;border-color:#888;background:#3a3a3c;}
+.pdf-zoom-level{font-size:11px;color:#888;min-width:42px;text-align:center;}
+.pdf-modal-close{background:none;border:1px solid #555;color:#999;border-radius:3px;padding:4px 10px;cursor:pointer;font-size:13px;transition:all .15s;}
+.pdf-modal-close:hover{color:#fff;border-color:#999;}
+.pdf-modal-dl{background:var(--accent);border:none;color:#fff;border-radius:3px;padding:5px 12px;cursor:pointer;font-size:11px;font-family:'IBM Plex Mono',monospace;letter-spacing:.06em;transition:background .15s;}
+.pdf-modal-dl:hover{background:var(--accent-dark);}
+/* viewport: overflow + panning */
+#pdf-modal-body{flex:1;overflow:auto;background:#525659;position:relative;cursor:grab;}
+#pdf-modal-body.panning{cursor:grabbing;}
+#pdf-canvas-wrap{display:flex;flex-direction:column;align-items:center;padding:20px;gap:14px;min-width:max-content;}
+#pdf-canvas-wrap canvas{display:block;box-shadow:0 3px 16px rgba(0,0,0,.6);transform-origin:top left;}
+#pdf-loading{color:#ccc;font-size:13px;padding:60px;text-align:center;}
+.btn-preview{background:transparent;border:1px solid var(--border2);color:var(--muted);border-radius:2px;padding:3px 8px;font-size:10px;font-family:'IBM Plex Mono',monospace;cursor:pointer;transition:border-color .15s,color .15s;white-space:nowrap;}
+.btn-preview:hover{border-color:var(--accent);color:var(--accent);}
+
+/* Pannello tempo stimato */
+#time-panel{display:none;margin-top:16px;background:var(--surface);border:1px solid var(--border);border-radius:2px;padding:16px 20px;}
+#time-panel.visible{display:block;}
+.time-panel-title{font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);margin-bottom:12px;border-bottom:1px solid var(--border);padding-bottom:8px;}
+.time-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;}
+.time-card{background:var(--bg);border:1px solid var(--border);border-radius:2px;padding:12px 14px;}
+.time-card .tc-label{font-size:9px;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);margin-bottom:4px;}
+.time-card .tc-value{font-size:1.25rem;font-weight:600;font-family:'IBM Plex Sans',sans-serif;color:var(--text);line-height:1.2;}
+.time-card .tc-sub{font-size:10px;color:var(--muted);margin-top:3px;}
+.time-card.card-green .tc-value{color:var(--green-dark);}
+.time-card.card-blue .tc-value{color:var(--accent);}
+.time-card.card-orange .tc-value{color:var(--orange);}
+#time-log-tbody tr:hover td{background:var(--sel);}
+#time-log-tbody td{padding:4px 8px;border-bottom:1px solid var(--border);color:var(--text);}
+#time-log-tbody tr:last-child td{border-bottom:none;}
+
+/* Animations */
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+@keyframes rowIn{from{opacity:0;transform:translateX(-6px)}to{opacity:1;transform:translateX(0)}}
+tr.new-row{animation:rowIn .2s ease both;}
+</style>
+</head>
+<body>
+
+<!-- ══ LOGIN SCREEN ══════════════════════════════════ -->
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-logo">PDF Core</div>
+    <div class="login-sub">Web v3.0 — Accesso richiesto</div>
+    <div class="login-field">
+      <label>Username</label>
+      <input type="text" id="login-user" autocomplete="username" placeholder="es. Daniele Ferrara"/>
+    </div>
+    <div class="login-field">
+      <label>Password</label>
+      <input type="password" id="login-pass" autocomplete="current-password" placeholder="••••••••"/>
+    </div>
+    <div class="login-err" id="login-err">Username o password errati.</div>
+    <button class="btn-login" id="btn-login">Accedi →</button>
+    <div class="login-creator">
+      <div class="cr-role">Sviluppato da</div>
+      <div class="cr-name">Ferrara Daniele</div>
+      <div class="cr-phone">📞 329 159 4220</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ PANNELLO ADMIN ════════════════════════════════ -->
+<div id="admin-panel">
+  <div class="admin-drawer">
+    <div class="admin-header">
+      <div>
+        <h2>⚙ Pannello Admin</h2>
+        <div class="sub">Gestione accessi — PDF Core</div>
+      </div>
+      <button class="admin-close" id="btn-admin-close">✕</button>
+    </div>
+    <div class="admin-body">
+
+      <!-- Password admin -->
+      <div class="admin-section-title">Password Admin</div>
+      <div class="admin-pwd-row">
+        <input type="password" id="new-admin-pwd" placeholder="Nuova password admin..."/>
+        <button class="btn btn-sm" style="background:var(--orange);color:#fff;border:none;" id="btn-change-pwd">Cambia</button>
+      </div>
+
+      <!-- Utenti -->
+      <div class="admin-section-title">Utenti registrati</div>
+      <table class="users-table">
+        <thead>
+          <tr>
+            <th>Username</th>
+            <th>Password</th>
+            <th>Ruolo</th>
+            <th>Stato</th>
+            <th>Ultimo accesso</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="users-tbody"></tbody>
+      </table>
+
+      <!-- Aggiungi utente -->
+      <div class="admin-section-title">Aggiungi utente</div>
+      <div class="add-user-form">
+        <div class="form-row">
+          <div class="form-field">
+            <label>Username</label>
+            <input type="text" id="new-username" placeholder="es. mario"/>
+          </div>
+          <div class="form-field">
+            <label>Password</label>
+            <input type="password" id="new-password" placeholder="password"/>
+          </div>
+        </div>
+        <div class="form-row" style="grid-template-columns:1fr 1fr;margin-bottom:14px;">
+          <div class="form-field">
+            <label>Ruolo</label>
+            <select id="new-role">
+              <option value="user">Utente</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
+          <div class="form-field" style="justify-content:flex-end;">
+            <label>&nbsp;</label>
+            <button class="btn btn-blue" id="btn-add-user" style="width:100%;">+ Aggiungi</button>
+          </div>
+        </div>
+        <div id="add-user-err" style="font-size:11px;color:var(--red);display:none;"></div>
+      </div>
+
+      <!-- Log -->
+      <div class="admin-section-title" style="margin-top:24px;">Log attività recenti</div>
+      <div class="log-list" id="log-list">
+        <div style="color:var(--muted);font-size:11px;">Nessuna attività registrata.</div>
+      </div>
+
+      <!-- Reset totale -->
+      <div style="margin-top:28px;padding-top:16px;border-top:1px solid var(--border);">
+        <button class="btn btn-red btn-sm" id="btn-reset-all">⚠ Reset completo (elimina tutti gli utenti)</button>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ══ APP ═══════════════════════════════════════════ -->
+<div id="app">
+  <header>
+    <div class="header-left">
+      <h1>PDF Core</h1><span class="version">Web v3.0</span>
+    </div>
+    <div class="header-right">
+      <div class="user-badge">
+        <div class="user-avatar" id="hdr-avatar">?</div>
+        <div>
+          <div id="hdr-username" style="color:#ddd;font-size:12px;">—</div>
+          <span class="user-role" id="hdr-role"></span>
+        </div>
+      </div>
+      <button class="btn-header btn-admin-open" id="btn-open-admin" style="display:none;">⚙ Admin</button>
+      <button class="btn-header" id="btn-logout">Esci</button>
+    </div>
+  </header>
+
+  <main>
+    <div class="section-label">Carica i PDF</div>
+    <div id="drop-zone">
+      <input type="file" id="file-input" accept=".pdf" multiple/>
+      <span class="dz-icon">📂</span>
+      <h2>Trascina i PDF qui</h2>
+      <p>oppure clicca per selezionarli · tutto avviene nel browser, nessun upload</p>
+    </div>
+
+    <div id="table-wrap">
+      <div class="toggle-row">
+        <label class="toggle"><input type="checkbox" id="toggle-sub"/><span class="slider"></span></label>
+        Crea Sottocartella
+        <span id="sub-folder-hint" style="display:none;font-size:10px;color:var(--muted);margin-left:8px;">↳ Compila la colonna <b>Sottocartella</b> per ogni file</span>
+      </div>
+      <div class="legend">
+        <span><kbd>Enter</kbd>/<kbd>↓</kbd> cella sotto</span>
+        <span><kbd>Tab</kbd> colonna</span>
+        <span><kbd>Ctrl+D</kbd> copia giù</span>
+        <span><kbd>Ctrl+↓</kbd> progressivo</span>
+        <span>Tasto destro → opzioni</span>
+        <span>Trascina ■ riempimento</span>
+      </div>
+      <div class="table-toolbar">
+        <div class="section-label" style="margin:0">Lista file — <span id="count-label" class="count-badge">0</span></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn btn-ghost btn-sm" id="btn-clear-all">✕ Rimuovi tutti</button>
+          <button class="btn btn-blue btn-sm" id="btn-add-more">+ Aggiungi PDF</button>
+          <input type="file" id="add-input" accept=".pdf" multiple style="display:none"/>
+          <button class="btn btn-green" id="btn-download-all">⬇ Scarica tutti rinominati</button>
+        </div>
+      </div>
+      <div id="tbl-scroll-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:28px"></th>
+              <th>#</th><th>Nome Attuale</th>
+              <th>Parte 1</th><th>Parte 2</th><th>Parte 3</th>
+              <th id="th-sub" style="display:none;color:#FF9500;">Sottocartella</th>
+              <th class="col-preview">Nuovo Nome</th><th>Anteprima</th><th></th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+      <div id="status-bar"></div>
+
+      <!-- Pannello tempo stimato -->
+      <div id="time-panel">
+        <div class="time-panel-title" id="time-panel-title">⏱ Stima tempo — sessione corrente</div>
+        <div class="time-grid">
+          <div class="time-card">
+            <div class="tc-label">File caricati</div>
+            <div class="tc-value" id="tc-files">0</div>
+            <div class="tc-sub">in questa sessione</div>
+          </div>
+          <div class="time-card card-orange">
+            <div class="tc-label">Tempo manuale stimato</div>
+            <div class="tc-value" id="tc-manual">0 min</div>
+            <div class="tc-sub">~20 sec per file a mano</div>
+          </div>
+          <div class="time-card card-blue">
+            <div class="tc-label">Tempo con PC (misurato)</div>
+            <div class="tc-value" id="tc-machine">— </div>
+            <div class="tc-sub">misurato al download ⚡</div>
+          </div>
+          <div class="time-card card-green">
+            <div class="tc-label">Tempo risparmiato</div>
+            <div class="tc-value" id="tc-saved">0 min</div>
+            <div class="tc-sub">risparmio effettivo</div>
+          </div>
+        </div>
+        <!-- Solo admin: riepilogo globale -->
+        <div id="time-panel-admin" style="display:none;margin-top:16px;border-top:1px solid var(--border);padding-top:14px;">
+          <div class="time-panel-title">📊 Riepilogo globale tutti gli utenti</div>
+          <div class="time-grid">
+            <div class="time-card">
+              <div class="tc-label">Sessioni totali</div>
+              <div class="tc-value" id="tc-total-sessions">0</div>
+              <div class="tc-sub">di tutti gli utenti</div>
+            </div>
+            <div class="time-card">
+              <div class="tc-label">File rinominati totali</div>
+              <div class="tc-value" id="tc-total-files">0</div>
+              <div class="tc-sub">cumulativo storico</div>
+            </div>
+            <div class="time-card card-orange">
+              <div class="tc-label">Tempo manuale totale</div>
+              <div class="tc-value" id="tc-total-manual">0</div>
+              <div class="tc-sub">se fatto a mano</div>
+            </div>
+            <div class="time-card card-green">
+              <div class="tc-label">Tempo totale risparmiato</div>
+              <div class="tc-value" id="tc-total-saved">0</div>
+              <div class="tc-sub">risparmio cumulativo</div>
+            </div>
+          </div>
+          <div style="margin-top:12px;max-height:180px;overflow-y:auto;background:var(--bg);border:1px solid var(--border);border-radius:2px;padding:8px 12px;">
+            <table style="width:100%;font-size:11px;border-collapse:collapse;" id="time-log-table">
+              <thead><tr style="color:var(--muted);text-transform:uppercase;letter-spacing:.08em;font-size:10px;">
+                <th style="text-align:left;padding:4px 8px;border-bottom:1px solid var(--border);">Utente</th>
+                <th style="text-align:left;padding:4px 8px;border-bottom:1px solid var(--border);">Data</th>
+                <th style="text-align:right;padding:4px 8px;border-bottom:1px solid var(--border);">File</th>
+                <th style="text-align:right;padding:4px 8px;border-bottom:1px solid var(--border);">Risparmio</th>
+              </tr></thead>
+              <tbody id="time-log-tbody"></tbody>
+            </table>
+          </div>
+          <div style="margin-top:8px;display:flex;gap:8px;">
+            <button class="btn btn-excel-style btn-sm" id="btn-export-excel-admin">📊 Esporta Excel (tutti)</button>
+            <button class="btn btn-ghost btn-sm" id="btn-reset-time-log" style="font-size:10px;">🗑 Resetta log</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- ══ PDF PREVIEW MODAL ══════════════════════════════ -->
+<div id="pdf-modal">
+  <div class="pdf-modal-box">
+    <div class="pdf-modal-header">
+      <span class="pdf-modal-title" id="pdf-modal-title">Anteprima PDF</span>
+      <div class="pdf-modal-nav">
+        <button id="btn-pdf-prev" title="PDF precedente (←)">‹ PDF</button>
+        <span class="pdf-modal-pages" id="pdf-modal-pages">1 / 1</span>
+        <button id="btn-pdf-next" title="PDF successivo (→)">PDF ›</button>
+      </div>
+      <span id="pdf-modal-pgcount" style="font-size:10px;color:#777;white-space:nowrap;"></span>
+      <div class="pdf-zoom-bar">
+        <button id="btn-zoom-out" title="Zoom out (−)">−</button>
+        <span class="pdf-zoom-level" id="pdf-zoom-level">100%</span>
+        <button id="btn-zoom-in"  title="Zoom in (+)">+</button>
+        <button id="btn-zoom-fit" title="Adatta alla finestra">⊡</button>
+      </div>
+      <button class="pdf-modal-dl" id="btn-pdf-modal-dl">⬇ Scarica</button>
+      <button class="pdf-modal-close" id="btn-pdf-modal-close">✕ Chiudi</button>
+    </div>
+    <div id="pdf-modal-body">
+      <div id="pdf-canvas-wrap">
+        <div id="pdf-loading">⏳ Caricamento PDF...</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Context Menu -->
+<div id="ctx-menu">
+  <div class="ctx-section">Riempimento</div>
+  <div class="ctx-item" id="ctx-copy-down"><span class="ctx-icon">⬇</span>Copia uguale giù<kbd>Ctrl+D</kbd></div>
+  <div class="ctx-item" id="ctx-prog-down"><span class="ctx-icon">🔢</span>Progressivo giù<kbd>Ctrl+↓</kbd></div>
+  <div class="ctx-item" id="ctx-prog-up"><span class="ctx-icon">🔼</span>Progressivo su (decrescente)</div>
+  <hr/>
+  <div class="ctx-section">Modifica</div>
+  <div class="ctx-item" id="ctx-clear-col"><span class="ctx-icon">🗑</span>Svuota colonna intera</div>
+  <div class="ctx-item" id="ctx-clear-cell"><span class="ctx-icon">✕</span>Svuota cella</div>
+  <hr/>
+  <div class="ctx-item" id="ctx-remove-row"><span class="ctx-icon">🗂</span>Rimuovi file</div>
+</div>
+
+<script>
+// ════════════════════════════════════════════════════
+// AUTH & USER MANAGEMENT — lettura pubblica da GitHub
+// ════════════════════════════════════════════════════
+const GH_RAW = 'https://raw.githubusercontent.com/ferraradaniele20-ui/pdfcore/main/users.json';
+const LOG_KEY = 'pdfcore_log';
+
+let _usersCache = null;
+
+async function ghGetUsers() {
+  try {
+    const r = await fetch(GH_RAW + '?nocache=' + Date.now());
+    if(!r.ok) return [];
+    return await r.json();
+  } catch { return []; }
+}
+
+function getUsers() { return _usersCache || []; }
+function saveUsers(users) {
+  // Salva in localStorage come cache locale
+  // Per aggiungere utenti permanenti: modifica users.json su GitHub
+  _usersCache = users;
+  localStorage.setItem('pdfcore_users_cache', JSON.stringify(users));
+}
+
+function getLogs() {
+  try { return JSON.parse(localStorage.getItem(LOG_KEY)) || []; } catch { return []; }
+}
+function addLog(msg) {
+  const logs = getLogs();
+  logs.unshift({ t: new Date().toLocaleTimeString('it'), msg });
+  if (logs.length > 50) logs.pop();
+  localStorage.setItem(LOG_KEY, JSON.stringify(logs));
+}
+
+let currentUser = null;
+
+async function tryLogin(username, password) {
+  showLoginLoading(true);
+  const users = await ghGetUsers();
+  _usersCache = users;
+  showLoginLoading(false);
+  let u = users.find(u => u.username === username);
+  if (!u || !u.active) return false;
+  if (u.password !== password) return false;
+  addLog(`Login: ${username}`);
+  return u;
+}
+
+function showLoginLoading(show) {
+  const btn = document.getElementById('btn-login');
+  btn.textContent = show ? '⏳ Connessione...' : 'Accedi →';
+  btn.disabled = show;
+}
+
+// ════════════════════════════════════════════════════
+// LOGIN UI
+// ════════════════════════════════════════════════════
+// initUsers rimosso — utenti su GitHub
+
+const loginScreen = document.getElementById('login-screen');
+const loginErr    = document.getElementById('login-err');
+const appDiv      = document.getElementById('app');
+
+async function doLogin() {
+  const u = document.getElementById('login-user').value.trim();
+  const p = document.getElementById('login-pass').value;
+  if(!u || !p){ loginErr.classList.add('show'); return; }
+  const user = await tryLogin(u, p);
+  if (!user) {
+    loginErr.classList.add('show');
+    document.getElementById('login-pass').value = '';
+    return;
+  }
+  loginErr.classList.remove('show');
+  currentUser = user;
+  loginScreen.classList.add('hidden');
+  appDiv.classList.add('visible');
+  document.getElementById('hdr-avatar').textContent = user.username[0].toUpperCase();
+  document.getElementById('hdr-username').textContent = user.username;
+  const roleEl = document.getElementById('hdr-role');
+  roleEl.textContent = user.role === 'admin' ? 'Admin' : 'Utente';
+  roleEl.className = 'user-role ' + (user.role === 'admin' ? 'role-admin' : 'role-user');
+  if (user.role === 'admin') document.getElementById('btn-open-admin').style.display = '';
+  // mostra/nascondi funzionalità per ruolo
+  applyRoleUI();
+}
+
+function applyRoleUI(){
+  const isAdmin = currentUser && currentUser.role === 'admin';
+  // pannello admin nel time panel
+  document.getElementById('time-panel-admin').style.display = isAdmin ? 'block' : 'none';
+  // titolo pannello
+  document.getElementById('time-panel-title').textContent = isAdmin
+    ? '⏱ Stima tempo — sessione corrente'
+    : '⏱ Tempo risparmiato questa sessione';
+  // aggiorna riepilogo globale se admin
+  if(isAdmin) renderAdminTimeLog();
+}
+
+document.getElementById('btn-login').addEventListener('click', doLogin);
+document.getElementById('login-pass').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+document.getElementById('login-user').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('login-pass').focus(); });
+
+document.getElementById('btn-logout').addEventListener('click', () => {
+  addLog(`Logout: ${currentUser?.username}`);
+  currentUser = null;
+  loginScreen.classList.remove('hidden');
+  appDiv.classList.remove('visible');
+  document.getElementById('login-user').value = '';
+  document.getElementById('login-pass').value = '';
+  document.getElementById('btn-open-admin').style.display = 'none';
+  files = []; selRow = -1; selCol = '';
+  document.getElementById('table-wrap').style.display = 'none';
+});
+
+// ════════════════════════════════════════════════════
+// ADMIN PANEL UI
+// ════════════════════════════════════════════════════
+const adminPanel = document.getElementById('admin-panel');
+
+document.getElementById('btn-open-admin').addEventListener('click', () => {
+  adminPanel.classList.add('open');
+  renderAdminUsers();
+  renderAdminLog();
+});
+document.getElementById('btn-admin-close').addEventListener('click', () => adminPanel.classList.remove('open'));
+adminPanel.addEventListener('click', e => { if (e.target === adminPanel) adminPanel.classList.remove('open'); });
+
+function getPlainPwd(username){
+  const u = getUsers().find(u => u.username === username);
+  return u ? u.password : '(nascosta)';
+}
+
+function renderAdminUsers() {
+  const users = getUsers();
+  const tbody = document.getElementById('users-tbody');
+  tbody.innerHTML = '';
+  users.forEach(u => {
+    const tr = document.createElement('tr');
+    const isMe = u.username === currentUser?.username;
+    const plainPwd = getPlainPwd(u.username);
+    const pwdId = 'pwd-' + u.username.replace(/\s+/g,'_');
+    tr.innerHTML = `
+      <td><b>${u.username}</b>${isMe ? ' <span style="font-size:10px;color:var(--muted)">(tu)</span>' : ''}</td>
+      <td class="pwd-cell">
+        <span id="${pwdId}" style="letter-spacing:.12em;">••••••••</span>
+        <button class="btn-show-pwd" data-pwdid="${pwdId}" data-plain="${esc(plainPwd)}" title="Mostra/Nascondi">👁</button>
+      </td>
+      <td>${u.role === 'admin' ? '<span class="badge-admin">Admin</span>' : '<span style="font-size:10px;color:var(--muted)">Utente</span>'}</td>
+      <td>${u.active ? '<span class="badge-active">Attivo</span>' : '<span class="badge-inactive">Disabilitato</span>'}</td>
+      <td style="font-size:10px;color:var(--muted)">${u.lastLogin || '—'}</td>
+      <td style="white-space:nowrap;">
+        ${!isMe ? `<button class="btn-toggle-user ${u.active ? 'disable' : 'enable'}" data-usr="${u.username}">${u.active ? 'Disabilita' : 'Abilita'}</button>
+        <button class="btn-del-user" data-usr="${u.username}">✕</button>` : '—'}
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+  tbody.querySelectorAll('.btn-show-pwd').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const span = document.getElementById(btn.dataset.pwdid);
+      if(!span) return;
+      const isHidden = span.textContent.includes('•');
+      span.textContent = isHidden ? btn.dataset.plain : '••••••••';
+      span.style.letterSpacing = isHidden ? '.05em' : '.12em';
+    });
+  });
+
+  tbody.querySelectorAll('.btn-toggle-user').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const users = getUsers();
+      const u = users.find(u => u.username === btn.dataset.usr);
+      if (u) { u.active = !u.active; saveUsers(users); addLog(`${u.active?'Abilitato':'Disabilitato'}: ${u.username}`); renderAdminUsers(); }
+    });
+  });
+  tbody.querySelectorAll('.btn-del-user').forEach(btn => {
+    btn.addEventListener('click', () => {
+
+      let users = getUsers();
+      users = users.filter(u => u.username !== btn.dataset.usr);
+      saveUsers(users); addLog(`Eliminato utente: ${btn.dataset.usr}`); renderAdminUsers();
+    });
+  });
+}
+
+function renderAdminLog() {
+  const logs = getLogs();
+  const el = document.getElementById('log-list');
+  if (!logs.length) { el.innerHTML = '<div style="color:var(--muted);font-size:11px;">Nessuna attività.</div>'; return; }
+  el.innerHTML = logs.map(l => `<div class="log-item"><span class="log-time">${l.t}</span><span class="log-msg">${l.msg}</span></div>`).join('');
+}
+
+document.getElementById('btn-add-user').addEventListener('click', async () => {
+  const username = document.getElementById('new-username').value.trim();
+  const password = document.getElementById('new-password').value;
+  const role     = document.getElementById('new-role').value;
+  const errEl    = document.getElementById('add-user-err');
+
+  if (!username || !password) { errEl.textContent = 'Compila username e password.'; errEl.style.display='block'; return; }
+  const users = getUsers();
+  if (users.find(u => u.username === username)) { errEl.textContent = 'Username già esistente.'; errEl.style.display='block'; return; }
+  errEl.style.display = 'none';
+  users.push({ username, password, role, active: true, lastLogin: '—' });
+  saveUsers(users);
+  addLog(`Aggiunto utente: ${username} (${role})`);
+  document.getElementById('new-username').value = '';
+  document.getElementById('new-password').value = '';
+  renderAdminUsers();
+  renderAdminLog();
+  showStatus('✅ Utente salvato su GitHub', 'success');
+});
+
+document.getElementById('btn-change-pwd').addEventListener('click', () => {
+  const newPwd = document.getElementById('new-admin-pwd').value;
+  if (!newPwd || newPwd.length < 4) { showStatus('Password troppo corta (min 4 caratteri)', 'error'); return; }
+  const users = getUsers();
+  const admin = users.find(u => u.role === 'admin' && u.username === 'Daniele Ferrara');
+  if (admin) { admin.password = newPwd; saveUsers(users); showStatus('✅ Password aggiornata su GitHub', 'success'); }
+  document.getElementById('new-admin-pwd').value = '';
+  addLog('Password admin aggiornata');
+  renderAdminLog();
+  alert('✓ Password admin aggiornata');
+});
+
+document.getElementById('btn-reset-all').addEventListener('click', () => {
+  if (!confirm('Sei sicuro? Verranno eliminati TUTTI gli utenti (tranne admin).')) return;
+  const users = getUsers().filter(u => u.role === 'admin');
+  saveUsers(users);
+  addLog('Reset utenti effettuato');
+  renderAdminUsers(); renderAdminLog();
+});
+
+// ════════════════════════════════════════════════════
+// PDF CORE LOGIC
+// ════════════════════════════════════════════════════
+let files = [];
+let nextId = 0;
+const PARTS = ['p1','p2','p3','sub'];
+let selRow = -1, selCol = '', editing = false;
+let fillDragging = false, fillStartRow = -1, fillStartCol = '';
+
+const dropZone  = document.getElementById('drop-zone');
+const fileInput = document.getElementById('file-input');
+const addInput  = document.getElementById('add-input');
+const tableWrap = document.getElementById('table-wrap');
+const tbody     = document.getElementById('tbody');
+const countLabel= document.getElementById('count-label');
+const toggleSub = document.getElementById('toggle-sub');
+const statusBar = document.getElementById('status-bar');
+const ctxMenu   = document.getElementById('ctx-menu');
+
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('drag-over'); addFiles([...e.dataTransfer.files].filter(f => f.type==='application/pdf')); });
+fileInput.addEventListener('change', () => { addFiles([...fileInput.files]); fileInput.value=''; });
+addInput.addEventListener('change',  () => { addFiles([...addInput.files]);  addInput.value=''; });
+document.getElementById('btn-add-more').addEventListener('click', () => addInput.click());
+
+async function addFiles(newFiles) {
+  if(!newFiles.length) return;
+  tableWrap.style.display = 'block';
+  const CHUNK = 200;
+
+  for(let i = 0; i < newFiles.length; i += CHUNK){
+    const chunk = newFiles.slice(i, i + CHUNK);
+    chunk.forEach(file => {
+      files.push({ id: nextId++, file, p1: '', p2:'', p3:'', sub:'' });
+    });
+    renderTable();
+    updateTimePanel();
+    showStatus(`⏳ Caricati ${Math.min(i+CHUNK, newFiles.length)} / ${newFiles.length} file...`, 'info');
+    // cede il controllo al browser tra un chunk e l'altro
+    await new Promise(r => setTimeout(r, 0));
+  }
+  showStatus(`✅ ${newFiles.length} file caricati`, 'success');
+}
+
+toggleSub.addEventListener('change', () => {
+  const show = toggleSub.checked;
+  document.getElementById('th-sub').style.display = show ? '' : 'none';
+  document.querySelectorAll('.col-sub').forEach(el => el.style.display = show ? '' : 'none');
+  document.getElementById('sub-folder-hint').style.display = show ? 'inline' : 'none';
+  if(!show) files.forEach(f => f.sub = '');
+  renderTable();
+});
+
+const scrollWrap = document.getElementById('tbl-scroll-wrap');
+
+function renderTable() {
+  countLabel.textContent = files.length + ' file';
+  if(files.length === 0){ tbody.innerHTML=''; highlightSelection(); return; }
+  const subDisp = toggleSub.checked ? '' : 'none';
+  let h = '';
+  for(let i=0; i<files.length; i++){
+    const e = files[i];
+    const preview = buildPreview(e);
+    const anim = i < 50 ? ' class="new-row"' : '';
+    const dly  = i < 20 ? ` style="animation-delay:${i*0.025}s"` : '';
+    h += `<tr${anim}${dly} data-idx="${i}">
+<td class="drag-row" draggable="false">⠿</td>
+<td class="num">${i+1}</td>
+<td class="original" title="${esc(e.file.name)}">${esc(e.file.name)}</td>
+<td class="cell" data-idx="${i}" data-col="p1"><input class="part-input" value="${esc(e.p1)}" placeholder="Parte 1" data-idx="${i}" data-col="p1"/><div class="fill-handle" data-idx="${i}" data-col="p1"></div></td>
+<td class="cell" data-idx="${i}" data-col="p2"><input class="part-input" value="${esc(e.p2)}" placeholder="Parte 2" data-idx="${i}" data-col="p2"/><div class="fill-handle" data-idx="${i}" data-col="p2"></div></td>
+<td class="cell" data-idx="${i}" data-col="p3"><input class="part-input" value="${esc(e.p3)}" placeholder="Parte 3" data-idx="${i}" data-col="p3"/><div class="fill-handle" data-idx="${i}" data-col="p3"></div></td>
+<td class="cell col-sub" data-idx="${i}" data-col="sub" style="display:${subDisp}"><input class="part-input" value="${esc(e.sub)}" placeholder="es. Fatture" data-idx="${i}" data-col="sub"/><div class="fill-handle" data-idx="${i}" data-col="sub"></div></td>
+<td class="preview ${preview?'':'empty'}" data-preview="${e.id}">${preview||'— vuoto —'}</td>
+<td class="actions"><button class="btn-preview" data-prev="${e.id}">👁 Anteprima</button></td>
+<td class="actions"><button class="btn btn-blue btn-sm" data-dl="${e.id}">⬇</button><button class="btn btn-ghost btn-sm" style="margin-left:4px" data-rm="${e.id}">✕</button></td>
+</tr>`;
+  }
+  tbody.innerHTML = h;
+  bindCellEvents();
+  highlightSelection();
+}
+
+function makeCellTd(entry,idx,col){
+  const ph=col==='p1'?'Parte 1':col==='p2'?'Parte 2':'Parte 3';
+  return `<td class="cell" data-idx="${idx}" data-col="${col}"><input class="part-input" value="${esc(entry[col])}" placeholder="${ph}" data-idx="${idx}" data-col="${col}"/><div class="fill-handle" data-idx="${idx}" data-col="${col}"></div></td>`;
+}
+
+function bindCellEvents() {
+  tbody.querySelectorAll('td.cell').forEach(td => {
+    td.addEventListener('mousedown', e => {
+      if (e.target.classList.contains('fill-handle')) return;
+      selectCell(parseInt(td.dataset.idx), td.dataset.col, false); e.preventDefault();
+    });
+    td.addEventListener('dblclick', e => {
+      if (e.target.classList.contains('fill-handle')) return;
+      selectCell(parseInt(td.dataset.idx), td.dataset.col, true);
+    });
+    td.addEventListener('contextmenu', e => {
+      e.preventDefault();
+      selectCell(parseInt(td.dataset.idx), td.dataset.col, false);
+      showCtxMenu(e.clientX, e.clientY);
+    });
+  });
+  tbody.querySelectorAll('input.part-input').forEach(input => {
+    input.addEventListener('input', e => {
+      const idx=parseInt(e.target.dataset.idx), col=e.target.dataset.col;
+      files[idx][col]=e.target.value; updatePreview(idx);
+    });
+    input.addEventListener('focus', e => {
+      const idx=parseInt(e.target.dataset.idx), col=e.target.dataset.col;
+      if(selRow!==idx||selCol!==col) selectCell(idx,col,false);
+    });
+    input.addEventListener('keydown', handleKeydown);
+  });
+  tbody.querySelectorAll('.fill-handle').forEach(h => {
+    h.addEventListener('mousedown', e => {
+      e.stopPropagation(); e.preventDefault();
+      fillDragging=true; fillStartRow=parseInt(h.dataset.idx); fillStartCol=h.dataset.col;
+      document.addEventListener('mousemove', onFillDrag);
+      document.addEventListener('mouseup', onFillDrop);
+    });
+  });
+  tbody.querySelectorAll('[data-dl]').forEach(btn => btn.addEventListener('click', () => downloadSingle(parseInt(btn.dataset.dl))));
+  tbody.querySelectorAll('[data-rm]').forEach(btn => btn.addEventListener('click', () => {
+    files=files.filter(f=>f.id!==parseInt(btn.dataset.rm));
+    if(selRow>=files.length) selRow=files.length-1;
+    renderTable(); if(!files.length){ tableWrap.style.display='none'; updateTimePanel(); }
+    else updateTimePanel();
+  }));
+
+  // ── Anteprima PDF via PDF.js ──
+  tbody.querySelectorAll('[data-prev]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const entry = files.find(f=>f.id===parseInt(btn.dataset.prev));
+      if(!entry) return;
+      openPdfPreview(entry);
+    });
+  });
+
+  // ── Drag to reorder rows ──
+  let rowDragSrc = null;
+  tbody.querySelectorAll('tr').forEach(tr => {
+    const handle = tr.querySelector('td.drag-row');
+    if(!handle) return;
+    handle.addEventListener('mousedown', () => { tr.draggable = true; });
+    document.addEventListener('mouseup', () => { tr.draggable = false; }, {once: false});
+
+    tr.addEventListener('dragstart', e => {
+      rowDragSrc = tr;
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', tr.dataset.idx);
+      setTimeout(()=>tr.classList.add('dragging-row'), 0);
+    });
+    tr.addEventListener('dragend', () => {
+      tr.draggable = false;
+      tr.classList.remove('dragging-row');
+      tbody.querySelectorAll('tr').forEach(r=>r.classList.remove('drag-row-over'));
+      // sync files array to DOM order
+      const newOrder = [...tbody.querySelectorAll('tr')].map(r=>parseInt(r.dataset.idx));
+      files = newOrder.map(i=>files[i]);
+      renderTable();
+    });
+    tr.addEventListener('dragover', e => {
+      e.preventDefault();
+      tbody.querySelectorAll('tr').forEach(r=>r.classList.remove('drag-row-over'));
+      if(tr !== rowDragSrc) tr.classList.add('drag-row-over');
+    });
+    tr.addEventListener('drop', e => {
+      e.preventDefault();
+      tr.classList.remove('drag-row-over');
+      if(!rowDragSrc || rowDragSrc===tr) return;
+      tbody.insertBefore(rowDragSrc, tr);
+    });
+  });
+}
+
+function selectCell(idx,col,startEdit) {
+  editing=startEdit; selRow=idx; selCol=col; highlightSelection();
+  const inp=getCellInput(idx,col);
+  if(inp) {
+    inp.focus();
+    if(startEdit){inp.classList.add('editing');inp.setSelectionRange(inp.value.length,inp.value.length);}
+    else{inp.classList.remove('editing');inp.setSelectionRange(0,0);}
+  }
+}
+function highlightSelection() {
+  tbody.querySelectorAll('td.cell').forEach(td=>{td.classList.remove('selected');const i=td.querySelector('input');if(i)i.classList.remove('editing');});
+  const td=getCellTd(selRow,selCol);
+  if(td){td.classList.add('selected');if(editing){const i=td.querySelector('input');if(i)i.classList.add('editing');}}
+}
+function getCellTd(idx,col){if(idx<0||idx>=files.length||!col)return null;return tbody.querySelector(`td.cell[data-idx="${idx}"][data-col="${col}"]`);}
+function getCellInput(idx,col){const td=getCellTd(idx,col);return td?td.querySelector('input'):null;}
+
+function handleKeydown(e) {
+  const idx=parseInt(e.target.dataset.idx), col=e.target.dataset.col;
+  if(!editing&&e.key.length===1&&!e.ctrlKey&&!e.metaKey){
+    editing=true;const inp=getCellInput(idx,col);
+    if(inp){inp.classList.add('editing');inp.value='';files[idx][col]='';updatePreview(idx);}return;
+  }
+  if(e.key==='Escape'){editing=false;highlightSelection();e.preventDefault();return;}
+  if(e.key==='F2'){editing=true;highlightSelection();const inp=getCellInput(idx,col);if(inp)inp.setSelectionRange(inp.value.length,inp.value.length);e.preventDefault();return;}
+  if(e.key==='Enter'||(e.key==='ArrowDown'&&!editing)){e.preventDefault();if(idx+1<files.length)selectCell(idx+1,col,false);return;}
+  if(e.key==='ArrowUp'&&!editing){e.preventDefault();if(idx-1>=0)selectCell(idx-1,col,false);return;}
+  if(e.key==='Tab'){
+    e.preventDefault();const cols=getVisibleCols();const ci=cols.indexOf(col);
+    if(!e.shiftKey){if(ci+1<cols.length)selectCell(idx,cols[ci+1],false);else if(idx+1<files.length)selectCell(idx+1,cols[0],false);}
+    else{if(ci-1>=0)selectCell(idx,cols[ci-1],false);else if(idx-1>=0)selectCell(idx-1,cols[cols.length-1],false);}return;
+  }
+  if((e.key==='ArrowLeft'||e.key==='ArrowRight')&&!editing){
+    e.preventDefault();const cols=getVisibleCols();const ci=cols.indexOf(col);
+    if(e.key==='ArrowLeft'&&ci>0)selectCell(idx,cols[ci-1],false);
+    if(e.key==='ArrowRight'&&ci<cols.length-1)selectCell(idx,cols[ci+1],false);return;
+  }
+  if((e.ctrlKey||e.metaKey)&&e.key==='d'){e.preventDefault();copyDown(idx,col);return;}
+  if((e.ctrlKey||e.metaKey)&&e.key==='ArrowDown'){e.preventDefault();progressiveDown(idx,col);return;}
+  if((e.ctrlKey||e.metaKey)&&e.key==='ArrowUp'){e.preventDefault();progressiveUp(idx,col);return;}
+}
+
+function getVisibleCols(){const c=['p1','p2','p3'];if(toggleSub.checked)c.push('sub');return c;}
+
+function copyDown(fromIdx,col){
+  const val=files[fromIdx][col];
+  for(let i=fromIdx+1;i<files.length;i++)files[i][col]=val;
+  renderTable();selectCell(fromIdx,col,false);
+  showStatus(`⬇ Copiato "${val}" in ${files.length-fromIdx-1} righe`,'success');
+}
+function progressiveDown(fromIdx,col){
+  const val=files[fromIdx][col];const{prefix,num,suffix,padLen}=parseProgressive(val);
+  if(num===null){showStatus('Nessun numero trovato','error');return;}
+  let counter=num;
+  for(let i=fromIdx+1;i<files.length;i++){counter++;files[i][col]=prefix+String(counter).padStart(padLen,'0')+suffix;}
+  renderTable();selectCell(fromIdx,col,false);
+  showStatus(`🔢 Progressivo applicato a ${files.length-fromIdx-1} righe`,'success');
+}
+function progressiveUp(fromIdx,col){
+  const val=files[fromIdx][col];const{prefix,num,suffix,padLen}=parseProgressive(val);
+  if(num===null){showStatus('Nessun numero trovato','error');return;}
+  let counter=num;
+  for(let i=fromIdx+1;i<files.length;i++){counter--;files[i][col]=prefix+String(Math.max(0,counter)).padStart(padLen,'0')+suffix;}
+  renderTable();selectCell(fromIdx,col,false);showStatus('🔼 Progressivo decrescente applicato','success');
+}
+function parseProgressive(val){
+  const m=val.match(/^(.*?)(\d+)(\D*)$/);
+  if(!m)return{prefix:'',num:null,suffix:'',padLen:1};
+  return{prefix:m[1],num:parseInt(m[2]),suffix:m[3],padLen:m[2].length};
+}
+
+function onFillDrag(e){
+  if(!fillDragging)return;
+  const el=document.elementFromPoint(e.clientX,e.clientY);if(!el)return;
+  const td=el.closest('td.cell');if(!td)return;
+  const toIdx=parseInt(td.dataset.idx);
+  tbody.querySelectorAll('td.cell').forEach(t=>t.classList.remove('in-range'));
+  if(toIdx>fillStartRow)for(let i=fillStartRow;i<=toIdx;i++){const t=getCellTd(i,fillStartCol);if(t)t.classList.add('in-range');}
+}
+function onFillDrop(e){
+  if(!fillDragging)return; fillDragging=false;
+  document.removeEventListener('mousemove',onFillDrag); document.removeEventListener('mouseup',onFillDrop);
+  const el=document.elementFromPoint(e.clientX,e.clientY);if(!el){renderTable();return;}
+  const td=el.closest('td.cell');if(!td){renderTable();return;}
+  const toIdx=parseInt(td.dataset.idx);
+  if(toIdx>fillStartRow){
+    const val=files[fillStartRow][fillStartCol];
+    const{num,prefix,suffix,padLen}=parseProgressive(val);
+    const isNumeric=num!==null;
+    for(let i=fillStartRow+1;i<=toIdx;i++){
+      if(isNumeric){const n=num+(i-fillStartRow);files[i][fillStartCol]=prefix+String(n).padStart(padLen,'0')+suffix;}
+      else files[i][fillStartCol]=val;
+    }
+    showStatus(`Riempite ${toIdx-fillStartRow} celle (${isNumeric?'progressivo':'copia'})`,'success');
+  }
+  renderTable(); selectCell(fillStartRow,fillStartCol,false);
+}
+
+function showCtxMenu(x,y){ctxMenu.style.left=Math.min(x,window.innerWidth-220)+'px';ctxMenu.style.top=Math.min(y,window.innerHeight-240)+'px';ctxMenu.style.display='block';}
+function hideCtxMenu(){ctxMenu.style.display='none';}
+document.addEventListener('click',hideCtxMenu);
+document.addEventListener('keydown',e=>{if(e.key==='Escape')hideCtxMenu();});
+
+document.getElementById('ctx-copy-down').addEventListener('click',()=>{if(selRow>=0&&selCol)copyDown(selRow,selCol);});
+document.getElementById('ctx-prog-down').addEventListener('click',()=>{if(selRow>=0&&selCol)progressiveDown(selRow,selCol);});
+document.getElementById('ctx-prog-up').addEventListener('click',()=>{if(selRow>=0&&selCol)progressiveUp(selRow,selCol);});
+document.getElementById('ctx-clear-col').addEventListener('click',()=>{if(!selCol)return;files.forEach(f=>f[selCol]='');renderTable();selectCell(selRow,selCol,false);showStatus(`Colonna ${selCol} svuotata`,'info');});
+document.getElementById('ctx-clear-cell').addEventListener('click',()=>{if(selRow<0||!selCol)return;files[selRow][selCol]='';renderTable();selectCell(selRow,selCol,false);});
+document.getElementById('ctx-remove-row').addEventListener('click',()=>{if(selRow<0)return;files.splice(selRow,1);selRow=Math.min(selRow,files.length-1);renderTable();if(!files.length)tableWrap.style.display='none';});
+
+function buildPreview(entry){const n=(entry.p1+entry.p2+entry.p3).trim();if(!n)return'';return n.toLowerCase().endsWith('.pdf')?n:n+'.pdf';}
+function updatePreview(idx){const entry=files[idx];if(!entry)return;const p=buildPreview(entry);const cell=tbody.querySelector(`[data-preview="${entry.id}"]`);if(cell){cell.textContent=p||'— vuoto —';cell.classList.toggle('empty',!p);}}
+function esc(str){return String(str).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');}
+
+function downloadSingle(id){
+  const e=files.find(f=>f.id===id);
+  if(!e)return;
+  const n=buildPreview(e);
+  if(!n){showStatus('Inserisci almeno Parte 1.','error');return;}
+  const url=URL.createObjectURL(e.file);
+  const a=document.createElement('a');a.href=url;a.download=n;
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(url),2000);
+  showStatus(`✓ Scaricato: ${n}`,'success');
+}
+
+document.getElementById('btn-download-all').addEventListener('click', downloadAll);
+
+// ── Scarica tutti: prova salvataggio diretto in cartella, fallback ZIP ───
+async function downloadAll(){
+  if(!files.length){ showStatus('Nessun file caricato.','error'); return; }
+  const missing = files.filter(f => !buildPreview(f));
+  if(missing.length){ showStatus(`⚠ ${missing.length} file senza nome — compilare prima.`,'error'); return; }
+
+  // ── METODO 1: File System Access API (Chrome/Edge ≥ 86) ──────────────
+  if(window.showDirectoryPicker){
+    try{
+      showStatus('📂 Seleziona la cartella di destinazione...','info');
+      const rootDir = await window.showDirectoryPicker({ mode:'readwrite' });
+      const t0 = performance.now();
+      showStatus(`⏳ Scrittura file... (0 / ${files.length})`,'info');
+
+      // cache delle sottocartelle già create
+      const dirCache = {};
+      const usedNames = {};
+
+      for(let i = 0; i < files.length; i++){
+        const entry = files[i];
+        let nome = buildPreview(entry);
+
+        // risolvi nomi duplicati per cartella
+        const nameKey = (entry.sub||'') + '/' + nome;
+        if(usedNames[nameKey] !== undefined){
+          usedNames[nameKey]++;
+          nome = nome.replace(/\.pdf$/i,`_${usedNames[nameKey]}.pdf`);
+        } else {
+          usedNames[nameKey] = 0;
+        }
+
+        // determina cartella di destinazione
+        let destDir = rootDir;
+        if(toggleSub.checked && entry.sub && entry.sub.trim()){
+          const subKey = entry.sub.trim();
+          if(!dirCache[subKey]){
+            dirCache[subKey] = await rootDir.getDirectoryHandle(subKey, { create: true });
+          }
+          destDir = dirCache[subKey];
+        }
+
+        const fh  = await destDir.getFileHandle(nome, { create: true });
+        const wr  = await fh.createWritable();
+        const buf = await entry.file.arrayBuffer();
+        await wr.write(buf);
+        await wr.close();
+        showStatus(`⏳ Salvati ${i+1} / ${files.length} file — ${entry.file.name}`,'info');
+      }
+      const realSec = (performance.now() - t0) / 1000;
+      lastRealMacSec = realSec;
+      updateTimePanel(realSec);
+      logCurrentSession(realSec);
+      showStatus(`✅ ${files.length} PDF salvati in ${formatDuration(realSec)} ⚡`,'success');
+      return;
+    } catch(err){
+      if(err.name === 'AbortError'){ showStatus('Operazione annullata.','info'); return; }
+      // se l'API fallisce per altro motivo, cade sul fallback ZIP
+      console.warn('File System API error, fallback to ZIP:', err);
+    }
+  }
+
+  // ── METODO 2: ZIP (Firefox, Safari, browser senza File System API) ────
+  if(typeof JSZip === 'undefined'){
+    showStatus('❌ JSZip non disponibile. Prova con Chrome o Edge.','error');
+    return;
+  }
+
+  showStatus(`⏳ Creazione ZIP con ${files.length} file...`,'info');
+  const zip = new JSZip();
+  const usedNames2 = {};
+
+  for(const entry of files){
+    let nome = buildPreview(entry);
+    const subFolder = (toggleSub.checked && entry.sub && entry.sub.trim())
+      ? entry.sub.trim() + '/'
+      : '';
+    const nameKey2 = subFolder + nome;
+    if(usedNames2[nameKey2] !== undefined){
+      usedNames2[nameKey2]++;
+      nome = nome.replace(/\.pdf$/i,`_${usedNames2[nameKey2]}.pdf`);
+    } else {
+      usedNames2[nameKey2] = 0;
+    }
+    const buf = await entry.file.arrayBuffer();
+    zip.file(subFolder + nome, buf);
+  }
+
+  const blob = await zip.generateAsync({ type:'blob', compression:'STORE' },
+    meta => showStatus(`⏳ ZIP ${Math.round(meta.percent)}%...`,'info'));
+  const t0zip = performance.now();
+
+  const dateStr = new Date().toISOString().slice(0,10);
+  const url = URL.createObjectURL(blob);
+  const a   = document.createElement('a');
+  a.href = url; a.download = `PDF_rinominati_${dateStr}.zip`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(url), 3000);
+  const realSecZip = (performance.now() - t0zip) / 1000;
+  lastRealMacSec = realSecZip;
+  updateTimePanel(realSecZip);
+  logCurrentSession(realSecZip);
+  showStatus(`✅ ZIP scaricato — ${files.length} file in ${formatDuration(realSecZip)} ⚡`,'success');
+}
+
+document.getElementById('btn-clear-all').addEventListener('click',()=>{files=[];selRow=-1;selCol='';renderTable();tableWrap.style.display='none';hideStatus();updateTimePanel();});
+
+function showStatus(msg,type='info'){statusBar.textContent=msg;statusBar.className=type;statusBar.style.display='flex';if(type==='success')setTimeout(hideStatus,3500);}
+function hideStatus(){statusBar.style.display='none';}
+
+// ════════════════════════════════════════════════════
+// PDF PREVIEW — PDF.js engine (no iframe, no blob block)
+// ════════════════════════════════════════════════════
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+// ─── stato PDF viewer ────────────────────────────────────────────────────
+let pdfDoc        = null;
+let pdfTotalPages = 0;
+let pdfFileIdx    = 0;
+let pdfZoom       = 1.0;   // fattore zoom corrente
+let pdfFitScale   = 1.0;   // scala "adatta finestra"
+
+const pdfBody = document.getElementById('pdf-modal-body');
+const pdfWrap = document.getElementById('pdf-canvas-wrap');
+
+// ─── apri PDF ─────────────────────────────────────────────────────────────
+async function openPdfPreview(entry) {
+  pdfFileIdx = files.findIndex(f => f.id === entry.id);
+  document.getElementById('pdf-modal').classList.add('open');
+  await loadPdfAtIndex(pdfFileIdx);
+}
+
+async function loadPdfAtIndex(idx) {
+  if(idx < 0 || idx >= files.length) return;
+  pdfFileIdx = idx;
+  const entry = files[idx];
+
+  document.getElementById('pdf-modal-title').textContent = entry.file.name;
+  document.getElementById('pdf-loading').style.display = 'block';
+  [...pdfWrap.querySelectorAll('canvas')].forEach(c => c.remove());
+
+  document.getElementById('btn-pdf-modal-dl').onclick = () => {
+    const url = URL.createObjectURL(entry.file);
+    const a = document.createElement('a'); a.href=url; a.download=entry.file.name; a.click();
+    setTimeout(()=>URL.revokeObjectURL(url), 2000);
+  };
+
+  const buf = await entry.file.arrayBuffer();
+  pdfDoc = await pdfjsLib.getDocument({data: buf}).promise;
+  pdfTotalPages = pdfDoc.numPages;
+
+  // calcola fit scale (prima pagina come riferimento)
+  const pg0  = await pdfDoc.getPage(1);
+  const vp0  = pg0.getViewport({scale: 1});
+  const bodyW = pdfBody.clientWidth  - 40;
+  const bodyH = pdfBody.clientHeight - 40;
+  pdfFitScale = Math.min(bodyW / vp0.width, bodyH / vp0.height, 2.5);
+  pdfZoom = pdfFitScale;
+
+  document.getElementById('pdf-loading').style.display = 'none';
+  updatePdfNav();
+  pdfBody.scrollTop = 0;
+  pdfBody.scrollLeft = 0;
+  await renderAllPages();
+}
+
+async function renderAllPages() {
+  [...pdfWrap.querySelectorAll('canvas')].forEach(c => c.remove());
+  document.getElementById('pdf-zoom-level').textContent = Math.round(pdfZoom * 100) + '%';
+
+  for(let p = 1; p <= pdfTotalPages; p++){
+    const page = await pdfDoc.getPage(p);
+    const vp   = page.getViewport({scale: pdfZoom});
+    const canvas = document.createElement('canvas');
+    canvas.width  = vp.width;
+    canvas.height = vp.height;
+    pdfWrap.appendChild(canvas);
+    await page.render({canvasContext: canvas.getContext('2d'), viewport: vp}).promise;
+  }
+}
+
+// ─── zoom ─────────────────────────────────────────────────────────────────
+const ZOOM_STEP = 0.2;
+const ZOOM_MIN  = 0.3;
+const ZOOM_MAX  = 5.0;
+
+async function applyZoom(newZoom, focalX, focalY) {
+  // salva posizione scroll relativa al punto focale
+  const scaleRatio = newZoom / pdfZoom;
+  pdfZoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, newZoom));
+
+  // centro dello scroll attuale
+  const cx = (focalX !== undefined) ? focalX : pdfBody.scrollLeft + pdfBody.clientWidth / 2;
+  const cy = (focalY !== undefined) ? focalY : pdfBody.scrollTop  + pdfBody.clientHeight / 2;
+
+  await renderAllPages();
+
+  // ricalibra scroll per mantenere il punto focale
+  pdfBody.scrollLeft = cx * scaleRatio - pdfBody.clientWidth  / 2;
+  pdfBody.scrollTop  = cy * scaleRatio - pdfBody.clientHeight / 2;
+}
+
+document.getElementById('btn-zoom-in').addEventListener('click', () =>
+  applyZoom(pdfZoom + ZOOM_STEP));
+document.getElementById('btn-zoom-out').addEventListener('click', () =>
+  applyZoom(pdfZoom - ZOOM_STEP));
+document.getElementById('btn-zoom-fit').addEventListener('click', () =>
+  applyZoom(pdfFitScale));
+
+// ─── zoom con rotellina del mouse ─────────────────────────────────────────
+pdfBody.addEventListener('wheel', e => {
+  if(!pdfDoc) return;
+  e.preventDefault();
+  const rect = pdfBody.getBoundingClientRect();
+  const focalX = (e.clientX - rect.left) + pdfBody.scrollLeft;
+  const focalY = (e.clientY - rect.top)  + pdfBody.scrollTop;
+  const delta  = e.deltaY < 0 ? ZOOM_STEP : -ZOOM_STEP;
+  applyZoom(pdfZoom + delta, focalX, focalY);
+}, {passive: false});
+
+// ─── pan con click+drag ───────────────────────────────────────────────────
+let isPanning = false, panStartX = 0, panStartY = 0, scrollStartX = 0, scrollStartY = 0;
+
+pdfBody.addEventListener('mousedown', e => {
+  if(e.button !== 0) return;
+  isPanning   = true;
+  panStartX   = e.clientX;
+  panStartY   = e.clientY;
+  scrollStartX = pdfBody.scrollLeft;
+  scrollStartY = pdfBody.scrollTop;
+  pdfBody.classList.add('panning');
+  e.preventDefault();
+});
+document.addEventListener('mousemove', e => {
+  if(!isPanning) return;
+  pdfBody.scrollLeft = scrollStartX - (e.clientX - panStartX);
+  pdfBody.scrollTop  = scrollStartY - (e.clientY - panStartY);
+});
+document.addEventListener('mouseup', () => {
+  isPanning = false;
+  pdfBody.classList.remove('panning');
+});
+
+// ─── navigazione tra file ─────────────────────────────────────────────────
+function updatePdfNav() {
+  const total = files.length;
+  document.getElementById('pdf-modal-pages').textContent = `${pdfFileIdx + 1} / ${total}`;
+  document.getElementById('pdf-modal-pgcount').textContent =
+    pdfTotalPages > 1 ? `${pdfTotalPages} pag.` : '';
+  document.getElementById('btn-pdf-prev').disabled = (pdfFileIdx === 0);
+  document.getElementById('btn-pdf-next').disabled = (pdfFileIdx >= total - 1);
+}
+
+document.getElementById('btn-pdf-prev').addEventListener('click', () => {
+  if(pdfFileIdx > 0) loadPdfAtIndex(pdfFileIdx - 1);
+});
+document.getElementById('btn-pdf-next').addEventListener('click', () => {
+  if(pdfFileIdx < files.length - 1) loadPdfAtIndex(pdfFileIdx + 1);
+});
+
+// ─── tastiera ─────────────────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  const modal = document.getElementById('pdf-modal');
+  if(!modal.classList.contains('open')) return;
+  if(e.key === 'ArrowLeft'  && !e.shiftKey) { e.preventDefault(); if(pdfFileIdx > 0) loadPdfAtIndex(pdfFileIdx - 1); }
+  if(e.key === 'ArrowRight' && !e.shiftKey) { e.preventDefault(); if(pdfFileIdx < files.length - 1) loadPdfAtIndex(pdfFileIdx + 1); }
+  if(e.key === '+' || e.key === '=') { e.preventDefault(); applyZoom(pdfZoom + ZOOM_STEP); }
+  if(e.key === '-')                  { e.preventDefault(); applyZoom(pdfZoom - ZOOM_STEP); }
+  if(e.key === '0')                  { e.preventDefault(); applyZoom(pdfFitScale); }
+  if(e.key === 'Escape')             { e.preventDefault(); closePdfModal(); }
+});
+
+// ─── chiudi modale ────────────────────────────────────────────────────────
+function closePdfModal(){
+  document.getElementById('pdf-modal').classList.remove('open');
+  pdfDoc = null;
+  [...pdfWrap.querySelectorAll('canvas')].forEach(c => c.remove());
+}
+document.getElementById('btn-pdf-modal-close').addEventListener('click', closePdfModal);
+document.getElementById('pdf-modal').addEventListener('click', e=>{
+  if(e.target === document.getElementById('pdf-modal')) closePdfModal();
+});
+
+// ════════════════════════════════════════════════════
+// TEMPO STIMATO
+// ════════════════════════════════════════════════════
+const SEC_MANUAL  = 20;
+const TIME_LOG_KEY = 'pdfcore_timelog';
+
+function formatDuration(seconds, showMs){
+  // showMs=true → mostra ms per valori sotto 60 sec
+  if(showMs && seconds < 60){
+    const ms = Math.round(seconds * 1000);
+    if(ms < 1000) return ms + ' ms';
+    const s = Math.floor(seconds);
+    const rem = Math.round((seconds - s) * 1000);
+    return rem > 0 ? s + ' sec ' + rem + ' ms' : s + ' sec';
+  }
+  if(seconds < 60) return seconds.toFixed(2) + ' sec';
+  const m = Math.floor(seconds/60);
+  const s = Math.floor(seconds%60);
+  const ms = Math.round((seconds - Math.floor(seconds)) * 1000);
+  if(m < 60) return s > 0 ? m + ' min ' + s + ' sec ' + ms + ' ms' : m + ' min';
+  const h = Math.floor(m/60);
+  const rm = m%60;
+  return rm > 0 ? h + ' h ' + rm + ' min ' + s + ' sec' : h + ' h ' + (s>0 ? s+' sec':'');
+}
+
+function getTimeLog(){ try{ return JSON.parse(localStorage.getItem(TIME_LOG_KEY))||[]; }catch{ return []; } }
+function saveTimeLog(log){ localStorage.setItem(TIME_LOG_KEY, JSON.stringify(log)); }
+
+function appendTimeLog(nFile, realMacSec){
+  if(!currentUser || !nFile) return;
+  const tManSec   = nFile * SEC_MANUAL;
+  const tMacSec   = realMacSec !== undefined ? realMacSec : 0;
+  const tSavedSec = tManSec - tMacSec;
+  const log = getTimeLog();
+  log.push({
+    utente: currentUser.username,
+    data:   new Date().toLocaleDateString('it-IT'),
+    ora:    new Date().toLocaleTimeString('it-IT'),
+    nFile,
+    tManSec,
+    tMacSec,
+    tSavedSec
+  });
+  saveTimeLog(log);
+  if(currentUser.role === 'admin') renderAdminTimeLog();
+}
+
+let lastRealMacSec = null; // tempo PC reale dell'ultima operazione
+
+function updateTimePanel(realMacSec){
+  const n = files.length;
+  const panel = document.getElementById('time-panel');
+  if(!n){ panel.classList.remove('visible'); lastRealMacSec = null; return; }
+  panel.classList.add('visible');
+  const tMan = n * SEC_MANUAL;
+  const tMac = realMacSec !== undefined ? realMacSec
+               : lastRealMacSec;
+  const tSaved = tMac !== null ? tMan - tMac : null;
+  document.getElementById('tc-files').textContent   = n;
+  document.getElementById('tc-manual').textContent  = formatDuration(tMan);
+  document.getElementById('tc-machine').textContent = tMac !== null
+    ? formatDuration(tMac, true) + ' ⚡'
+    : '—';
+  document.getElementById('tc-saved').textContent   = tSaved !== null
+    ? formatDuration(tSaved, true)
+    : '—';
+}
+
+// ── Reset log (listener qui, dopo le definizioni delle funzioni) ─────────
+document.getElementById('btn-reset-time-log').onclick = function(){
+  localStorage.removeItem(TIME_LOG_KEY);
+  renderAdminTimeLog();
+  updateTimePanel();
+  showStatus('🗑 Log resettato.','info');
+};
+
+function renderAdminTimeLog(){
+  const log = getTimeLog();
+  const tbody = document.getElementById('time-log-tbody');
+  if(!tbody) return;
+  if(!log.length){
+    tbody.innerHTML = '<tr><td colspan="4" style="color:var(--muted);padding:8px;text-align:center;">Nessuna sessione registrata.</td></tr>';
+    document.getElementById('tc-total-sessions').textContent = 0;
+    document.getElementById('tc-total-files').textContent    = 0;
+    document.getElementById('tc-total-manual').textContent   = '0 sec';
+    document.getElementById('tc-total-saved').textContent    = '0 sec';
+    return;
+  }
+  // totali
+  const totFiles = log.reduce((a,r)=>a+r.nFile, 0);
+  const totMan   = log.reduce((a,r)=>a+r.tManSec, 0);
+  const totSaved = log.reduce((a,r)=>a+r.tSavedSec, 0);
+  document.getElementById('tc-total-sessions').textContent = log.length;
+  document.getElementById('tc-total-files').textContent    = totFiles;
+  document.getElementById('tc-total-manual').textContent   = formatDuration(totMan);
+  document.getElementById('tc-total-saved').textContent    = formatDuration(totSaved);
+  // righe log (più recenti prima)
+  tbody.innerHTML = [...log].reverse().slice(0,3).map(r=>`
+    <tr>
+      <td>${esc(r.utente)}</td>
+      <td style="color:var(--muted)">${r.data} ${r.ora}</td>
+      <td style="text-align:right">${r.nFile}</td>
+      <td style="text-align:right;color:var(--green-dark)">${formatDuration(r.tSavedSec)}</td>
+    </tr>`).join('');
+}
+
+// Salva log quando si scaricano i file (evento scarica tutti)
+function logCurrentSession(realMacSec){
+  if(files.length) appendTimeLog(files.length, realMacSec);
+}
+
+// ── Bottoni admin time log ────────────────────────────────────────────────
+document.getElementById('btn-export-excel-admin').addEventListener('click', () => {
+  const log = getTimeLog();
+  if(!log.length){ showStatus('Nessun dato nel log.', 'error'); return; }
+
+  const wb = XLSX.utils.book_new();
+  const wsData = [
+    ["Utente", "Data", "Ora", "N° File Rinominati", "Tempo Manuale (min)", "Tempo PC (min)", "Risparmio (min)"],
+    ...log.map(r=>[
+      r.utente, r.data, r.ora, r.nFile,
+      parseFloat((r.tManSec/60).toFixed(2)),
+      r.tMacSec < 60 ? parseFloat(r.tMacSec.toFixed(3)) : parseFloat((r.tMacSec/60).toFixed(4)),
+      parseFloat((r.tSavedSec/60).toFixed(2))
+    ])
+  ];
+
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
+  ws['!cols'] = [{ wch: 22 }, { wch: 14 }, { wch: 10 }, { wch: 18 }, { wch: 22 }, { wch: 16 }, { wch: 18 }];
+
+  const hStyle = {
+    font: { bold: true, color: { rgb: "FFFFFF" }, sz: 11, name: "IBM Plex Mono" },
+    fill: { fgColor: { rgb: "1a1a1a" }, patternType: "solid" },
+    alignment: { horizontal: "center", vertical: "center", wrapText: true },
+    border: { top:{style:"thin",color:{rgb:"444444"}}, bottom:{style:"thin",color:{rgb:"444444"}}, left:{style:"thin",color:{rgb:"444444"}}, right:{style:"thin",color:{rgb:"444444"}} }
+  };
+  const dStyle = (leftAlign) => ({
+    font: { sz: 11, color: { rgb: "1a1a1a" }, name: "IBM Plex Mono" },
+    fill: { fgColor: { rgb: "F4F1EB" }, patternType: "solid" },
+    alignment: { horizontal: leftAlign ? "left" : "center", vertical: "center" },
+    border: { top:{style:"thin",color:{rgb:"C4BFB3"}}, bottom:{style:"thin",color:{rgb:"C4BFB3"}}, left:{style:"thin",color:{rgb:"C4BFB3"}}, right:{style:"thin",color:{rgb:"C4BFB3"}} }
+  });
+
+  ['A','B','C','D','E','F','G'].forEach((col, i) => {
+    if (ws[col+'1']) ws[col+'1'].s = hStyle;
+    for(let ri=2; ri<=log.length+1; ri++){
+      if(ws[col+ri]) ws[col+ri].s = dStyle(i===0);
+    }
+  });
+  ws['!rows'] = [{ hpt: 30 }, ...Array(log.length).fill({ hpt: 22 })];
+
+  XLSX.utils.book_append_sheet(wb, ws, "Log Utilizzi");
+
+  const dateStr = new Date().toISOString().slice(0, 10);
+  XLSX.writeFile(wb, `tempo_risparmiato_${dateStr}.xlsx`);
+  showStatus(`📊 Excel esportato — ${log.length} sessioni, ${log.reduce((a,r)=>a+r.nFile,0)} file totali`, 'success');
+});
+</script>
+</body>
+</html>
