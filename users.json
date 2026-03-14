@@ -5,5 +5,12 @@
     "role": "admin",
     "active": true,
     "lastLogin": "—"
+  },
+  {
+    "username": "Giuseppe",
+    "password": "1",
+    "role": "user",
+    "active": true,
+    "lastLogin": "—"
   }
 ]
